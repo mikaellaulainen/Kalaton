@@ -1,69 +1,242 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import * as maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
+
+const fishingSpots = [
+  {
+    name: "Lohjanjärvi",
+    coordinates: [24.1, 60.25] as [number, number],
+    fish: "Kuha, hauki, ahven",
+    permit: "Kalastuslupa tarvitaan",
+    permitUrl: "#",
+    parking: "Pysäköintipaikkoja löytyy alueelta",
+    boatRamp: "Veneluiska löytyy alueelta",
+    restrictions: "Tarkista ajantasaiset kalastusrajoitukset",
+  },
+  {
+    name: "Hiidenvesi",
+    coordinates: [24.25, 60.4] as [number, number],
+    fish: "Kuha, hauki, ahven",
+    permit: "Kalastuslupa tarvitaan",
+    permitUrl: "#",
+    parking: "Pysäköintipaikkoja löytyy rannan läheltä",
+    boatRamp: "Veneluiska löytyy alueelta",
+    restrictions: "Tarkista ajantasaiset kalastusrajoitukset",
+  },
+  {
+    name: "Päijänne",
+    coordinates: [25.55, 61.5] as [number, number],
+    fish: "Kuha, hauki, ahven, taimen",
+    permit: "Tarkista lupa-alue",
+    permitUrl: "#",
+    parking: "Pysäköintipaikkoja löytyy useilta alueilta",
+    boatRamp: "Veneluiska löytyy useilta alueilta",
+    restrictions: "Tarkista ajantasaiset kalastusrajoitukset",
+  },
+  {
+    name: "Saimaa",
+    coordinates: [28.0, 61.3] as [number, number],
+    fish: "Kuha, hauki, ahven, taimen",
+    permit: "Tarkista lupa-alue",
+    permitUrl: "#",
+    parking: "Pysäköintipaikkoja löytyy useilta alueilta",
+    boatRamp: "Veneluiska löytyy useilta alueilta",
+    restrictions: "Tarkista ajantasaiset kalastusrajoitukset",
+  },
+];
 
 export default function Home() {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (!mapContainer.current) return;
+
+    const map = new maplibregl.Map({
+      container: mapContainer.current,
+      style: {
+        version: 8,
+        sources: {
+          osm: {
+            type: "raster",
+            tiles: [
+              "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+            ],
+            tileSize: 256,
+          },
+        },
+        layers: [
+          {
+            id: "osm",
+            type: "raster",
+            source: "osm",
+          },
+        ],
+      },
+      center: [25.5, 61.5],
+      zoom: 6,
+    });
+
+    mapRef.current = map;
+
+    map.addControl(
+      new maplibregl.NavigationControl(),
+      "top-right"
+    );
+
+    fishingSpots.forEach((spot) => {
+      new maplibregl.Marker()
+        .setLngLat(spot.coordinates)
+        .setPopup(
+          new maplibregl.Popup({ maxWidth: "320px" }).setHTML(`
+            <div style="color: #111; font-family: sans-serif;">
+              <h3 style="font-size: 18px; font-weight: 700; margin: 0 0 12px;">
+                🎣 ${spot.name}
+              </h3>
+
+              <div style="margin-bottom: 8px;">
+                <strong>🐟 Kalalajit</strong>
+                <div>${spot.fish}</div>
+              </div>
+
+              <div style="margin-bottom: 8px;">
+                <strong>🎫 Kalastuslupa</strong>
+                <div>${spot.permit}</div>
+              </div>
+
+              <div style="margin-bottom: 8px;">
+                <strong>🚗 Pysäköinti</strong>
+                <div>${spot.parking}</div>
+              </div>
+
+              <div style="margin-bottom: 8px;">
+                <strong>🚤 Veneluiska</strong>
+                <div>${spot.boatRamp}</div>
+              </div>
+
+              <div style="margin-bottom: 12px;">
+                <strong>⚠️ Rajoitukset</strong>
+                <div>${spot.restrictions}</div>
+              </div>
+
+              <a
+                href="${spot.permitUrl}"
+                style="
+                  display: block;
+                  background: #000;
+                  color: #fff;
+                  text-align: center;
+                  padding: 10px 12px;
+                  border-radius: 8px;
+                  text-decoration: none;
+                  font-weight: 600;
+                "
+              >
+                🎫 Katso kalastuslupa
+              </a>
+            </div>
+          `)
+        )
+        .addTo(map);
+    });
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+  }, []);
+
+  const searchResults = search.trim()
+    ? fishingSpots.filter((spot) =>
+        spot.name.toLowerCase().includes(search.toLowerCase())
+      )
+    : [];
+
+  function selectSpot(
+    coordinates: [number, number]
+  ) {
+    if (!mapRef.current) return;
+
+    mapRef.current.flyTo({
+      center: coordinates,
+      zoom: 11,
+      duration: 1200,
+    });
+
+    setSearch("");
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+    <main className="relative h-screen w-screen">
+      {/* Kartta */}
+      <div
+        ref={mapContainer}
+        className="h-full w-full"
+      />
+
+      {/* Hakukenttä */}
+      <div className="absolute left-4 top-4 z-10 w-80 max-w-[calc(100%-2rem)]">
+        <div className="overflow-hidden rounded-xl bg-white shadow-lg">
+          <div className="flex">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Hae kalastuspaikkaa..."
+              className="min-w-0 flex-1 bg-white px-4 py-3 text-black placeholder:text-gray-500 outline-none"
+              style={{ caretColor: "black" }}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+            <button
+              onClick={() => {
+                const result = fishingSpots.find((spot) =>
+                  spot.name.toLowerCase().includes(search.toLowerCase())
+                );
+
+                if (result && mapRef.current) {
+                  mapRef.current.flyTo({
+                    center: result.coordinates,
+                    zoom: 11,
+                    duration: 1200,
+                  });
+                }
+              }}
+              className="bg-black px-4 py-3 text-white hover:bg-gray-800 hover:bg-gray-800"
+            >
+              Hae
+            </button>
+          </div>
+
+          {searchResults.length > 0 && (
+            <div className="border-t border-gray-200">
+              {searchResults.map((spot) => (
+                <button
+                  key={spot.name}
+                  onClick={() => selectSpot(spot.coordinates)}
+                  className="block w-full px-4 py-3 text-left hover:bg-gray-100"
+                >
+                  <div className="font-medium text-black">
+                    🎣 {spot.name}
+                  </div>
+
+                  <div className="text-sm text-gray-500">
+                    {spot.fish}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {search.trim() && searchResults.length === 0 && (
+            <div className="border-t border-gray-200 px-4 py-3 text-sm text-gray-500">
+              Ei kalastuspaikkoja
+            </div>
+          )}
         </div>
-      </main>
-    </div>
+      </div>
+    </main>
   );
 }
