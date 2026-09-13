@@ -1,58 +1,38 @@
+
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-
-const fishingSpots = [
-  {
-    name: "Lohjanjärvi",
-    coordinates: [24.1, 60.25] as [number, number],
-    fish: "Kuha, hauki, ahven",
-    permit: "Kalastuslupa tarvitaan",
-    permitUrl: "#",
-    parking: "Pysäköintipaikkoja löytyy alueelta",
-    boatRamp: "Veneluiska löytyy alueelta",
-    restrictions: "Tarkista ajantasaiset kalastusrajoitukset",
-  },
-  {
-    name: "Hiidenvesi",
-    coordinates: [24.25, 60.4] as [number, number],
-    fish: "Kuha, hauki, ahven",
-    permit: "Kalastuslupa tarvitaan",
-    permitUrl: "#",
-    parking: "Pysäköintipaikkoja löytyy rannan läheltä",
-    boatRamp: "Veneluiska löytyy alueelta",
-    restrictions: "Tarkista ajantasaiset kalastusrajoitukset",
-  },
-  {
-    name: "Päijänne",
-    coordinates: [25.55, 61.5] as [number, number],
-    fish: "Kuha, hauki, ahven, taimen",
-    permit: "Tarkista lupa-alue",
-    permitUrl: "#",
-    parking: "Pysäköintipaikkoja löytyy useilta alueilta",
-    boatRamp: "Veneluiska löytyy useilta alueilta",
-    restrictions: "Tarkista ajantasaiset kalastusrajoitukset",
-  },
-  {
-    name: "Saimaa",
-    coordinates: [28.0, 61.3] as [number, number],
-    fish: "Kuha, hauki, ahven, taimen",
-    permit: "Tarkista lupa-alue",
-    permitUrl: "#",
-    parking: "Pysäköintipaikkoja löytyy useilta alueilta",
-    boatRamp: "Veneluiska löytyy useilta alueilta",
-    restrictions: "Tarkista ajantasaiset kalastusrajoitukset",
-  },
-];
+import { supabase } from "@/lib/supabase";
 
 export default function Home() {
+  const [dbSpots, setDbSpots] = useState<any[]>([]);
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
 
   const [search, setSearch] = useState("");
 
+  // Haetaan kalastuspaikat Supabasesta
+  useEffect(() => {
+    async function loadSpots() {
+      const { data, error } = await supabase
+        .from("fishing_spots")
+        .select("*");
+
+      if (error) {
+        console.error("Supabase error:", error);
+        return;
+      }
+
+      console.log("Supabase spots:", data);
+      setDbSpots(data);
+    }
+
+    loadSpots();
+  }, []);
+
+  // Luodaan kartta
   useEffect(() => {
     if (!mapContainer.current) return;
 
@@ -88,9 +68,19 @@ export default function Home() {
       "top-right"
     );
 
-    fishingSpots.forEach((spot) => {
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+  }, []);
+
+  // Lisätään Supabasesta haetut paikat kartalle
+  useEffect(() => {
+    if (!mapRef.current || dbSpots.length === 0) return;
+
+    dbSpots.forEach((spot) => {
       new maplibregl.Marker()
-        .setLngLat(spot.coordinates)
+        .setLngLat([spot.longitude, spot.latitude])
         .setPopup(
           new maplibregl.Popup({ maxWidth: "320px" }).setHTML(`
             <div style="color: #111; font-family: sans-serif;">
@@ -115,7 +105,7 @@ export default function Home() {
 
               <div style="margin-bottom: 8px;">
                 <strong>🚤 Veneluiska</strong>
-                <div>${spot.boatRamp}</div>
+                <div>${spot.boat_ramp}</div>
               </div>
 
               <div style="margin-bottom: 12px;">
@@ -124,7 +114,7 @@ export default function Home() {
               </div>
 
               <a
-                href="${spot.permitUrl}"
+                href="${spot.permit_url}"
                 style="
                   display: block;
                   background: #000;
@@ -141,28 +131,21 @@ export default function Home() {
             </div>
           `)
         )
-        .addTo(map);
+        .addTo(mapRef.current!);
     });
-
-    return () => {
-      map.remove();
-      mapRef.current = null;
-    };
-  }, []);
+  }, [dbSpots]);
 
   const searchResults = search.trim()
-    ? fishingSpots.filter((spot) =>
+    ? dbSpots.filter((spot) =>
         spot.name.toLowerCase().includes(search.toLowerCase())
       )
     : [];
 
-  function selectSpot(
-    coordinates: [number, number]
-  ) {
+  function selectSpot(longitude: number, latitude: number) {
     if (!mapRef.current) return;
 
     mapRef.current.flyTo({
-      center: coordinates,
+      center: [longitude, latitude],
       zoom: 11,
       duration: 1200,
     });
@@ -192,19 +175,20 @@ export default function Home() {
 
             <button
               onClick={() => {
-                const result = fishingSpots.find((spot) =>
-                  spot.name.toLowerCase().includes(search.toLowerCase())
+                const result = dbSpots.find((spot) =>
+                  spot.name
+                    .toLowerCase()
+                    .includes(search.toLowerCase())
                 );
 
-                if (result && mapRef.current) {
-                  mapRef.current.flyTo({
-                    center: result.coordinates,
-                    zoom: 11,
-                    duration: 1200,
-                  });
+                if (result) {
+                  selectSpot(
+                    result.longitude,
+                    result.latitude
+                  );
                 }
               }}
-              className="bg-black px-4 py-3 text-white hover:bg-gray-800 hover:bg-gray-800"
+              className="bg-black px-4 py-3 text-white hover:bg-gray-800"
             >
               Hae
             </button>
@@ -214,8 +198,13 @@ export default function Home() {
             <div className="border-t border-gray-200">
               {searchResults.map((spot) => (
                 <button
-                  key={spot.name}
-                  onClick={() => selectSpot(spot.coordinates)}
+                  key={spot.id}
+                  onClick={() =>
+                    selectSpot(
+                      spot.longitude,
+                      spot.latitude
+                    )
+                  }
                   className="block w-full px-4 py-3 text-left hover:bg-gray-100"
                 >
                   <div className="font-medium text-black">
